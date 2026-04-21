@@ -8,14 +8,14 @@ from src.merge import build_replacements, merge_template, get_template_fields
 
 
 class TestBuildReplacements:
-    def test_maps_data_columns_to_merge_fields(self):
+    def test_maps_data_columns_to_placeholders(self):
         row = {"Learner Name": "Tan Wei Ming", "Grades": "Distinction"}
         config = {"programme_name": "AI Analytics", "end_date": "15 May 2025"}
         result = build_replacements(row, config)
-        assert result["Learner_Name"] == "Tan Wei Ming"
+        assert result["Learner Name"] == "Tan Wei Ming"
         assert result["Grades"] == "Distinction"
-        assert result["Programme_Name"] == "AI Analytics"
-        assert result["End_Date"] == "15 May 2025"
+        assert result["Programme Name"] == "AI Analytics"
+        assert result["End Date"] == "15 May 2025"
 
     def test_nan_values_become_empty_string(self):
         row = {"Learner Name": "Alice", "Grades": float("nan")}
@@ -27,8 +27,8 @@ class TestBuildReplacements:
         row = {"Learner Name": "Alice", "Grades": "A"}
         config = {}
         result = build_replacements(row, config)
-        assert result["Programme_Name"] == ""
-        assert result["End_Date"] == ""
+        assert result["Programme Name"] == ""
+        assert result["End Date"] == ""
 
 
 class TestMergeTemplate:
@@ -37,10 +37,10 @@ class TestMergeTemplate:
         tmp_out.close()
         try:
             replacements = {
-                "Learner_Name": "Test Learner",
+                "Learner Name": "Test Learner",
                 "Grades": "Distinction",
-                "Programme_Name": "AI Analytics",
-                "End_Date": "15 May 2025",
+                "Programme Name": "AI Analytics",
+                "End Date": "15 May 2025",
             }
             result = merge_template(sample_template_path, replacements, tmp_out.name)
             assert Path(result).exists()
@@ -53,10 +53,10 @@ class TestMergeTemplate:
         tmp_out.close()
         try:
             replacements = {
-                "Learner_Name": "Test Learner",
+                "Learner Name": "Test Learner",
                 "Grades": "Pass",
-                "Programme_Name": "Test Programme",
-                "End_Date": "1 Jan 2025",
+                "Programme Name": "Test Programme",
+                "End Date": "1 Jan 2025",
             }
             merge_template(sample_template_path, replacements, tmp_out.name)
             assert Path(tmp_out.name).stat().st_size > 1000
@@ -72,11 +72,11 @@ class TestMergeTemplate:
         tmp_out.close()
         try:
             replacements = {
-                "Learner_Name": "Test",
+                "Learner Name": "Test",
                 "Grades": "A",
-                "Programme_Name": "Prog",
-                "End_Date": "2025",
-                "Nonexistent_Field": "should be ignored",
+                "Programme Name": "Prog",
+                "End Date": "2025",
+                "Nonexistent Field": "should be ignored",
             }
             merge_template(sample_template_path, replacements, tmp_out.name)
             assert Path(tmp_out.name).exists()
@@ -87,10 +87,10 @@ class TestMergeTemplate:
 class TestGetTemplateFields:
     def test_returns_expected_fields(self, sample_template_path):
         fields = get_template_fields(sample_template_path)
-        assert "Learner_Name" in fields
+        assert "Learner Name" in fields
         assert "Grades" in fields
-        assert "Programme_Name" in fields
-        assert "End_Date" in fields
+        assert "Programme Name" in fields
+        assert "End Date" in fields
 
     def test_file_not_found(self):
         with pytest.raises(FileNotFoundError):

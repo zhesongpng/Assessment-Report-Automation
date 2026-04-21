@@ -30,7 +30,7 @@ template_file = st.file_uploader(
     "Word template (.docx)",
     type=["docx"],
     key="template_uploader",
-    help="Upload a Word document with mail merge fields (Learner_Name, Grades, Programme_Name, End_Date).",
+    help="Upload a Word document with placeholders like <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<End Date>>.",
 )
 
 template_valid = False
@@ -75,7 +75,7 @@ if data_file:
             name_col = _find_column(df, "Learner Name")
             grades_col = _find_column(df, "Grades")
             if name_col and grades_col:
-                st.info(f"Column mapping: '{name_col}' → Learner_Name, '{grades_col}' → Grades")
+                st.info(f"Column mapping: '{name_col}' → <<Learner Name>>, '{grades_col}' → <<Grades>>")
         else:
             for err in validation["errors"]:
                 st.error(err)

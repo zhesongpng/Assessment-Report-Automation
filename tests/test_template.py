@@ -1,4 +1,4 @@
-"""Tests for template validation and merge field detection."""
+"""Tests for template validation and placeholder detection."""
 import io
 import tempfile
 from pathlib import Path
@@ -22,10 +22,10 @@ class TestDetectMergeFields:
     def test_detects_fields_in_real_template(self, sample_template_path):
         fields = detect_merge_fields(sample_template_path)
         assert isinstance(fields, list)
-        assert "Learner_Name" in fields
+        assert "Learner Name" in fields
         assert "Grades" in fields
-        assert "Programme_Name" in fields
-        assert "End_Date" in fields
+        assert "Programme Name" in fields
+        assert "End Date" in fields
 
     def test_returns_sorted_list(self, sample_template_path):
         fields = detect_merge_fields(sample_template_path)

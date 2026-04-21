@@ -1,47 +1,45 @@
-"""Template validation and merge field detection via python-docx."""
+"""Template validation and placeholder detection via python-docx."""
 import re
 import tempfile
 from pathlib import Path
 
 from docx import Document
-from docx.oxml.ns import qn
 
 
-def _extract_merge_fields(doc):
-    """Extract MERGEFIELD names from a python-docx Document.
+def _extract_placeholders(doc):
+    """Find all <<Placeholder>> patterns in a python-docx Document.
 
-    Scans both complex fields (<w:instrText>) and simple fields (<w:fldSimple>).
+    Scans paragraphs (including tables, headers, footers).
     """
-    fields = set()
-    for element in doc.element.iter():
-        if element.tag == qn('w:instrText'):
-            text = element.text or ''
-            match = re.search(r'MERGEFIELD\s+"?([A-Za-z_]\w*)"?', text, re.IGNORECASE)
-            if match:
-                fields.add(match.group(1))
-        if element.tag == qn('w:fldSimple'):
-            instr = element.get(qn('w:instr'), '') or ''
-            match = re.search(r'MERGEFIELD\s+"?([A-Za-z_]\w*)"?', instr, re.IGNORECASE)
-            if match:
-                fields.add(match.group(1))
-    return fields
+    placeholders = set()
+    for paragraph in doc.paragraphs:
+        placeholders.update(m.strip() for m in re.findall(r'<<(.+?)>>', paragraph.text))
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    placeholders.update(m.strip() for m in re.findall(r'<<(.+?)>>', paragraph.text))
+    for section in doc.sections:
+        for part in [section.header, section.first_page_header, section.even_page_header,
+                      section.footer, section.first_page_footer, section.even_page_footer]:
+            if part and not getattr(part, 'is_linked_to_previous', True):
+                for paragraph in part.paragraphs:
+                    placeholders.update(m.strip() for m in re.findall(r'<<(.+?)>>', paragraph.text))
+    return placeholders
 
 
 def detect_merge_fields(template_path):
-    """Detect MERGEFIELD entries in a Word template.
+    """Detect <<Placeholder>> entries in a Word template.
 
-    Returns sorted list of unique field names.
+    Returns sorted list of unique placeholder names.
     """
     doc = Document(template_path)
-    fields = _extract_merge_fields(doc)
+    fields = _extract_placeholders(doc)
     return sorted(fields)
 
 
 def validate_template(uploaded_file):
     """Validate an uploaded Word template.
-
-    Args:
-        uploaded_file: Streamlit UploadedFile object (has .name, .getvalue(), .read())
 
     Returns:
         {"valid": bool, "fields": list[str], "error": str|None}
@@ -64,13 +62,13 @@ def validate_template(uploaded_file):
         tmp.close()
 
         doc = Document(tmp.name)
-        fields = _extract_merge_fields(doc)
+        fields = _extract_placeholders(doc)
 
         if not fields:
             return {
                 "valid": False,
                 "fields": [],
-                "error": "No merge fields found in this template. Your template needs Word mail merge fields (Insert → Quick Parts → Field → MergeField)."
+                "error": "No placeholders found. Add <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<End Date>> in your template."
             }
 
         return {"valid": True, "fields": sorted(fields), "error": None}
