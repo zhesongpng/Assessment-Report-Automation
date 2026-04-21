@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from mailmerge import MailMerge
 
 from src.template import detect_merge_fields, validate_template
 

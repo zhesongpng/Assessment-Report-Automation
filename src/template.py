@@ -1,21 +1,43 @@
-"""Template validation and merge field detection."""
-from mailmerge import MailMerge
-from pathlib import Path
+"""Template validation and merge field detection via python-docx."""
+import re
 import tempfile
-import shutil
+from pathlib import Path
+
+from docx import Document
+from docx.oxml.ns import qn
 
 
-def detect_merge_fields(template_path: str) -> list[str]:
+def _extract_merge_fields(doc):
+    """Extract MERGEFIELD names from a python-docx Document.
+
+    Scans both complex fields (<w:instrText>) and simple fields (<w:fldSimple>).
+    """
+    fields = set()
+    for element in doc.element.iter():
+        if element.tag == qn('w:instrText'):
+            text = element.text or ''
+            match = re.search(r'MERGEFIELD\s+"?([A-Za-z_]\w*)"?', text, re.IGNORECASE)
+            if match:
+                fields.add(match.group(1))
+        if element.tag == qn('w:fldSimple'):
+            instr = element.get(qn('w:instr'), '') or ''
+            match = re.search(r'MERGEFIELD\s+"?([A-Za-z_]\w*)"?', instr, re.IGNORECASE)
+            if match:
+                fields.add(match.group(1))
+    return fields
+
+
+def detect_merge_fields(template_path):
     """Detect MERGEFIELD entries in a Word template.
 
     Returns sorted list of unique field names.
     """
-    doc = MailMerge(template_path)
-    fields = doc.get_merge_fields()
+    doc = Document(template_path)
+    fields = _extract_merge_fields(doc)
     return sorted(fields)
 
 
-def validate_template(uploaded_file) -> dict:
+def validate_template(uploaded_file):
     """Validate an uploaded Word template.
 
     Args:
@@ -31,7 +53,6 @@ def validate_template(uploaded_file) -> dict:
     if not name.lower().endswith('.docx'):
         return {"valid": False, "fields": [], "error": "Please upload a Word document (.docx)."}
 
-    # Save to temp file for mailmerge to read
     tmp = None
     try:
         content = uploaded_file.getvalue()
@@ -42,18 +63,19 @@ def validate_template(uploaded_file) -> dict:
         tmp.write(content)
         tmp.close()
 
-        fields = detect_merge_fields(tmp.name)
+        doc = Document(tmp.name)
+        fields = _extract_merge_fields(doc)
 
         if not fields:
             return {
                 "valid": False,
                 "fields": [],
-                "error": "No merge fields found in this template. Your template needs Word mail merge fields (Insert \u2192 Quick Parts \u2192 Field \u2192 MergeField)."
+                "error": "No merge fields found in this template. Your template needs Word mail merge fields (Insert → Quick Parts → Field → MergeField)."
             }
 
-        return {"valid": True, "fields": fields, "error": None}
+        return {"valid": True, "fields": sorted(fields), "error": None}
 
-    except Exception as e:
+    except Exception:
         return {"valid": False, "fields": [], "error": "Could not read this file. It may be corrupted or not a valid Word document."}
 
     finally:
