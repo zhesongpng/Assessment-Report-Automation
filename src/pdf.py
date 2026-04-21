@@ -1,4 +1,4 @@
-"""PDF conversion and password protection."""
+"""PDF conversion and edit restriction."""
 import subprocess
 import secrets
 import tempfile
@@ -97,21 +97,17 @@ def convert_to_pdf(docx_path: Path, output_dir: Path, session_id: str, learner_i
     raise ConversionError(f"No PDF generated for learner {learner_idx}")
 
 
-def generate_owner_password() -> str:
-    """Generate a random owner password for PDF encryption."""
-    return secrets.token_urlsafe(16)
+def protect_pdf(input_path: Path, output_path: Path, owner_password: str) -> Path:
+    """Apply edit restrictions to a PDF. Anyone can open it, but cannot modify.
 
-
-def protect_pdf(input_path: Path, output_path: Path, user_password: str, owner_password: str) -> Path:
-    """Apply AES-256 encryption and edit restrictions to a PDF.
-
-    Permissions: print allowed, modify/extract/annotate denied.
+    Uses the owner password to enforce: print allowed, modify/extract/annotate denied.
+    No user password means anyone can open the file without entering a password.
+    Use the owner password in Adobe Acrobat to unlock editing if needed.
 
     Args:
         input_path: Path to unencrypted PDF
         output_path: Where to write the protected PDF
-        user_password: Password required to open the file
-        owner_password: Password for permission enforcement
+        owner_password: Password for permission enforcement (used to unlock editing)
 
     Returns:
         Path to protected PDF
@@ -120,7 +116,6 @@ def protect_pdf(input_path: Path, output_path: Path, user_password: str, owner_p
     pdf.save(
         output_path,
         encryption=pikepdf.Encryption(
-            user=user_password,
             owner=owner_password,
             allow=pikepdf.Permissions(
                 accessibility=True,

@@ -16,7 +16,7 @@ def sample_config():
     return {
         "programme_name": "AI Powered Business Analytics",
         "end_date": "15 May 2025",
-        "password": "TestPass123",
+        "owner_password": "TestOwner123",
         "pattern": "{LearnerName}_{ProgrammeName}_AssessmentReport.pdf",
     }
 

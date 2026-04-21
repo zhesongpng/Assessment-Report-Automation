@@ -1,11 +1,10 @@
 """Tests for PDF conversion and protection."""
-import tempfile
 from pathlib import Path
 
 import pikepdf
 import pytest
 
-from src.pdf import check_libreoffice, convert_to_pdf, generate_owner_password, protect_pdf, ConversionError
+from src.pdf import check_libreoffice, convert_to_pdf, protect_pdf, ConversionError
 
 
 class TestCheckLibreoffice:
@@ -14,20 +13,8 @@ class TestCheckLibreoffice:
         assert isinstance(result, bool)
 
 
-class TestGenerateOwnerPassword:
-    def test_length(self):
-        pw = generate_owner_password()
-        assert len(pw) >= 16
-
-    def test_unique(self):
-        pw1 = generate_owner_password()
-        pw2 = generate_owner_password()
-        assert pw1 != pw2
-
-
 class TestProtectPdf:
-    def test_password_protection_works(self, tmp_path):
-        # Create a minimal PDF for testing
+    def _make_test_pdf(self, tmp_path):
         pdf = pikepdf.Pdf.new()
         page = pikepdf.Page(pikepdf.Dictionary(
             Type=pikepdf.Name("/Page"),
@@ -37,37 +24,26 @@ class TestProtectPdf:
         input_pdf = tmp_path / "input.pdf"
         pdf.save(input_pdf)
         pdf.close()
+        return input_pdf
 
+    def test_edit_restrictions_no_password_to_open(self, tmp_path):
+        input_pdf = self._make_test_pdf(tmp_path)
         output_pdf = tmp_path / "protected.pdf"
-        protect_pdf(input_pdf, output_pdf, "testpass", generate_owner_password())
+        protect_pdf(input_pdf, output_pdf, "testowner")
 
         assert output_pdf.exists()
-        # Verify password is required
-        with pytest.raises(pikepdf.PasswordError):
-            pikepdf.open(output_pdf)
-        # Verify correct password works
-        opened = pikepdf.open(output_pdf, password="testpass")
+        # File can be opened without a password
+        opened = pikepdf.open(output_pdf)
         assert len(opened.pages) == 1
+        assert opened.is_encrypted
         opened.close()
 
     def test_permissions_restrict_editing(self, tmp_path):
-        pdf = pikepdf.Pdf.new()
-        page = pikepdf.Page(pikepdf.Dictionary(
-            Type=pikepdf.Name("/Page"),
-            MediaBox=[0, 0, 612, 792],
-        ))
-        pdf.pages.append(page)
-        input_pdf = tmp_path / "input.pdf"
-        pdf.save(input_pdf)
-        pdf.close()
-
+        input_pdf = self._make_test_pdf(tmp_path)
         output_pdf = tmp_path / "protected.pdf"
-        owner_pw = generate_owner_password()
-        protect_pdf(input_pdf, output_pdf, "userpass", owner_pw)
+        protect_pdf(input_pdf, output_pdf, "testowner")
 
-        # Open with owner password and check permissions
-        opened = pikepdf.open(output_pdf, password="userpass")
-        # pikepdf provides encryption info but permissions checking is indirect
+        opened = pikepdf.open(output_pdf)
         assert opened.is_encrypted
         opened.close()
 
@@ -81,8 +57,8 @@ class TestConvertToPdf:
         from src.merge import merge_template
         merged = tmp_path / "merged.docx"
         merge_template(sample_template_path, {
-            "Learner_Name": "Test", "Grades": "A",
-            "Programme_Name": "Prog", "End_Date": "2025",
+            "Lear_Name": "Test", "Grades": "A",
+            "Programme Name": "Prog", "End Date": "2025",
         }, str(merged))
 
         pdf_path = convert_to_pdf(merged, tmp_path, "test_session", 0)

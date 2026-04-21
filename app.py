@@ -15,7 +15,7 @@ from src.pipeline import process_batch, cleanup_session
 st.set_page_config(page_title="Assessment Report Automation", page_icon="📄", layout="centered")
 
 st.title("Assessment Report Automation")
-st.caption("Upload your Word template and Excel data, then generate password-protected PDF reports for each learner.")
+st.caption("Upload your Word template and Excel data, then generate PDF reports for each learner. PDFs are restricted from editing.")
 
 # Check LibreOffice availability once
 if "libreoffice_ok" not in st.session_state:
@@ -95,18 +95,8 @@ if data_file:
 st.header("3. Configure")
 programme_name = st.text_input("Programme Name", placeholder="e.g., AI Powered Business Analytics")
 end_date = st.text_input("End Date", placeholder="e.g., 15 May 2025")
-password = st.text_input("PDF Password", type="password", help="All PDFs will be protected with this password. Users need it to open the files. Minimum 4 characters.")
-st.caption("Minimum 4 characters. This password will be required to open each PDF.")
-confirm_password = st.text_input("Confirm Password", type="password")
-
-# Password match feedback
-if password and confirm_password:
-    if password != confirm_password:
-        st.error("Passwords do not match.")
-    elif len(password) < 4:
-        st.error("Password must be at least 4 characters.")
-    else:
-        st.success("Passwords match.")
+owner_password = st.text_input("Owner Password", type="password", help="Set a password to lock PDF editing. Recipients can view and print but cannot edit. Use this password in Adobe Acrobat if you need to unlock editing later.")
+st.caption("Keep this password safe — you'll need it to edit the PDFs later. Minimum 4 characters.")
 
 # Naming preview
 if template_valid and data_valid and programme_name:
@@ -138,10 +128,8 @@ ready = (
     and data_valid
     and programme_name
     and end_date
-    and password
-    and confirm_password
-    and password == confirm_password
-    and len(password) >= 4
+    and owner_password
+    and len(owner_password) >= 4
     and st.session_state.libreoffice_ok
 )
 
@@ -154,7 +142,7 @@ if st.button("Generate Reports", disabled=not ready, type="primary"):
     config = {
         "programme_name": programme_name,
         "end_date": end_date,
-        "password": password,
+        "owner_password": owner_password,
         "pattern": DEFAULT_PATTERN,
     }
 
@@ -218,14 +206,6 @@ if "batch_result" in st.session_state:
         with st.expander("Files included"):
             for f in result["filenames"]:
                 st.text(f)
-
-    # Password reminder
-    if password:
-        show_pw = st.checkbox("Show password")
-        if show_pw:
-            st.code(password)
-        else:
-            st.text("Password: ••••••••")
 
     # Start over
     if st.button("Start Over"):

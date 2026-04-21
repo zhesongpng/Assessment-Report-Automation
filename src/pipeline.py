@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 from src.merge import merge_template, build_replacements
-from src.pdf import convert_to_pdf, protect_pdf, generate_owner_password, check_libreoffice
+from src.pdf import convert_to_pdf, protect_pdf, check_libreoffice
 from src.naming import generate_filename, DEFAULT_PATTERN
 
 
@@ -43,8 +43,8 @@ def process_batch(
     protected_dir.mkdir()
 
     pattern = config.get("pattern", DEFAULT_PATTERN)
-    password = config["password"]
     programme_name = config["programme_name"]
+    owner_password = config["owner_password"]
 
     total = len(data_df)
     successes = []
@@ -70,10 +70,9 @@ def process_batch(
             # Generate filename
             filename = generate_filename(pattern, row.to_dict(), programme_name)
 
-            # Protect PDF
+            # Protect PDF (edit-restricted, no password needed to open)
             protected_path = protected_dir / filename
-            owner_pw = generate_owner_password()
-            protect_pdf(pdf_path, protected_path, password, owner_pw)
+            protect_pdf(pdf_path, protected_path, owner_password)
 
             successes.append((filename, protected_path))
 
