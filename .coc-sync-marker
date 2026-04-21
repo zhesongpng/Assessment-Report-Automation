@@ -1,0 +1,9 @@
+synced_at: "2026-04-13T00:00:00+08:00"
+source: loom/
+target: kailash-coc-claude-py
+gate1: skipped (py proposal status: distributed)
+gate2: completed
+files_updated: 30
+files_added: 0
+content_adapted: 3 (codify.md, 03-creating-components.md, agents.md)
+sdk_pins: kailash 2.8.4→2.8.5, added kailash-mcp>=0.2.3

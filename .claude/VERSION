@@ -1,0 +1,62 @@
+{
+  "version": "3.5.7",
+  "type": "coc-use-template",
+  "description": "COC USE template for Python SDK projects",
+  "released": "2026-04-19",
+  "upstream": {
+    "name": "kailash",
+    "type": "coc-source",
+    "version": "2.8.8",
+    "build_version": "2.8.19",
+    "synced_at": "2026-04-19T00:00:00Z",
+    "sdk_packages": {
+      "kailash": "2.8.8",
+      "kailash-dataflow": "2.0.12",
+      "kailash-nexus": "2.1.1",
+      "kailash-kaizen": "2.7.5",
+      "kailash-pact": "0.8.2",
+      "kailash-mcp": "0.2.5",
+      "kailash-ml": "0.11.1",
+      "kailash-align": "0.3.2",
+      "kailash-trust": "0.1.1",
+      "kaizen-agents": "0.9.3"
+    }
+  },
+  "changelog": [
+    {
+      "version": "3.5.7",
+      "date": "2026-04-19",
+      "summary": "Sync loom 2.8.19 — 7 global rule extensions (post-release audit bundle from kailash-py round-9/10 codify). Keyspace version bump invalidation parity, multi-site kwarg plumbing, __all__ module-scope hygiene, cross-SDK structural API divergence disposition, phantom transitive deps, post-release reviewer audit gate, framework dispatch method drift (iterate-the-data). Plus 7 SDK pin bumps reflecting PyPI releases this session including kaizen-agents 0.9.3 finally on PyPI.",
+      "changes": [
+        "MODIFIED (global): rules/tenant-isolation.md — added §3a Keyspace Version Bumps Require Invalidation-Path Sweep. When CacheKeyGenerator bumps default keyspace (v1→v2 for BP-049), EVERY invalidator MUST be audited same PR; use version-wildcard (dataflow:v*:*) to sweep legacy+current. Origin: kailash-py PR #522/#529 (dataflow 2.0.11→2.0.12 fast-patch).",
+        "MODIFIED (global): rules/security.md — added § Multi-Site Kwarg Plumbing. When security-relevant kwarg (policy, tenant, clearance, audit-id) is plumbed through a helper, EVERY call site MUST update same PR; 'safe default' is by definition the insecure default. Origin: kailash-py PR #522/#529 BP-049 validate_model plumbing miss on DataFlowEngine.validate_record sibling.",
+        "MODIFIED (global): rules/orphan-detection.md — added Rule 6 Module-Scope Public Imports Appear In __all__. Eagerly-imported-but-absent-from-__all__ is BLOCKED. `from pkg import *` drops advertised API; doc generators, typing tools, linters read __all__ as canonical. Origin: kailash-py PR #523/#529 (kailash-ml 0.11.0→0.11.1 fast-patch — DeviceReport + 3 siblings eagerly imported, omitted from __all__).",
+        "MODIFIED (global): rules/cross-sdk-inspection.md — added §3a Structural API-Divergence Disposition. When sibling SDK reports bug at API surface this SDK doesn't expose (kailash-rs#424 execute_raw arity divergence), disposition MUST include (a) Tier 2 test through sibling binding path and (b) structural invariant test locking signature. Origin: kailash-py issue #525 / PR #528.",
+        "MODIFIED (global): rules/dependencies.md — added § Phantom Transitive Deps — Resolve Via Lockfile Upgrade, Not Local Caps. When pip check / cargo tree -d / npm ls reports conflict whose root is unused transitive, fix via lockfile upgrade (uv lock --upgrade-package X + uv sync / cargo update -p / npm update) NOT manifest cap. Origin: kailash-py PR #530 (google-generativeai phantom held protobuf, blocked kailash-align 0.3.2). NOTE: file is 319 lines, 19 over soft 300-line cc-artifacts guideline — deliberately retained at this length given comprehensive multi-ecosystem coverage; flag for review.",
+        "MODIFIED (global): rules/agents.md — added Quality Gates table row 'After release (post-merge audit)': RECOMMENDED reviewer run against MERGED release commit on main as follow-up. If CRIT/HIGH surfaces, patch same session as x.y.z+1. Origin: kailash-py round-9→round-10 pattern (pre-release gates clean; post-release reviewer found CRIT+HIGH+2 MED; fast-patched within 20min as dataflow 2.0.12 + ml 0.11.1).",
+        "MODIFIED (global): rules/framework-first.md — added § Framework Version-Stable Integration — Drive The Data, Not The Dispatch. When integrating external framework lifecycle hooks, if both dispatch method and handler list/dict exposed, iterate the DATA structure (stable across versions); dispatch method names are subject to underscore-prefix transitions and removal. Origin: kailash-nexus 2.1.0→2.1.1 — shipped calling app.router.startup()/.shutdown() crashed uvicorn lifespan on FastAPI versions that exposed only _startup; fix iterates on_startup/on_shutdown lists directly (what FastAPI's _DefaultLifespan does internally).",
+        "SDK PINS (all PyPI-verified 2026-04-19, round-9+round-10 bundles): kailash 2.8.7→2.8.8, kailash-dataflow 2.0.10→2.0.12, kailash-nexus 2.1.0→2.1.1 (patch for dispatch-method-drift fix), kailash-kaizen 2.7.5 held, kailash-mcp 0.2.5 held, kailash-ml 0.10.0→0.11.1 (major+patch), kailash-align 0.3.1→0.3.2 (extras pin), kailash-pact 0.8.1→0.8.2, kailash-trust NEW pin >=0.1.1 (added to dependencies list), kaizen-agents 0.9.2→0.9.3 (finally on PyPI after being held at floor for 3 prior syncs).",
+        "VERSION: template 3.5.6→3.5.7; upstream.build_version 2.8.18→2.8.19; upstream.version 2.8.7→2.8.8 (published). sdk_packages map rebuilt to reflect current BUILD+PyPI state; kailash-trust added to the map."
+      ]
+    },
+    {
+      "version": "3.5.6",
+      "date": "2026-04-19",
+      "summary": "Reconcile nexus-http-status-convention skill body shape ({error, status} \u2192 {error, code}) to match SDK contract verified by red-team. Companion to 2.8.17 rule.",
+      "changes": [
+        "SKILL REWRITE (global): skills/03-nexus/nexus-http-status-convention.md \u2014 body shape corrected from {error, status} to {error, code}. Aligns with rules/nexus-http-status-convention.md (loom 2.8.17) and the actual SDK contract from kailash-rs#404 S8, verified by red-team grep against 8 production references in crates/kailash-nexus/src/ (every shipping NexusError.into_response() call uses {error, code}). Skill retitled as catalog companion to the rule; code column added (INVALID_INPUT, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, PAYLOAD_TOO_LARGE, UNPROCESSABLE_ENTITY, RATE_LIMIT_EXCEEDED, INTERNAL_ERROR, UPSTREAM_FAILED, SERVICE_UNAVAILABLE, UPSTREAM_TIMEOUT). Examples updated to NexusHandlerError + JsonBody/PathParam extractors. Origin: loom 2.8.18 (reconciles skill with 2.8.17 rule).",
+        "VERSION: template 3.5.5\u21923.5.6; upstream.build_version 2.8.16\u21922.8.18. No SDK pin changes (sdk_packages unchanged)."
+      ]
+    },
+    {
+      "version": "3.5.5",
+      "date": "2026-04-19",
+      "summary": "Sync loom 2.8.16 \u2014 kailash-py 2026-04-19 codify (9 PRs, 6 PyPI releases). New worktree-isolation.md rule (orchestrator pinning + specialist self-check + parent file-verify), 4 global rules extended (agents.md verify-deliverables, zero-tolerance.md Rule 1a \u00a7 __all__/__getattr__, observability.md Rule 9 reserved LogRecord attrs, dataflow-identifier-safety.md Rule 6 primitive-vs-orchestrator layer distinction, testing.md \u00a7 Test-Skip Triage, deployment.md \u00a7 TestPyPI Trusted-Publisher Per-Package), nexus-specialist.md TypedServiceClient (S2S) pattern, plus catch-up of security.md sanitizer contract + dependencies.md optional-feature-gate rule.",
+      "changes": [
+        "NEW RULE (global): rules/worktree-isolation.md (127 lines) \u2014 3 MUST rules: orchestrator prompts MUST pin absolute worktree path + STEP 0 git status verification; specialist agents MUST self-verify cwd at start (git rev-parse --show-toplevel + abbrev-ref HEAD); parent MUST ls/Read claimed files after agent exit.",
+        "(prior changelog entries preserved \u2026)"
+      ]
+    }
+  ],
+  "updated": "2026-04-19T00:00:00Z"
+}
