@@ -30,7 +30,7 @@ template_file = st.file_uploader(
     "Word template (.docx)",
     type=["docx"],
     key="template_uploader",
-    help="Upload a Word document with placeholders like <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<End Date>>.",
+    help="Upload a Word document with placeholders like <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<Programme date>>, <<Start Date>>, <<End Date>>.",
 )
 
 template_valid = False
@@ -94,7 +94,8 @@ if data_file:
 # ── Section 3: Configuration ────────────────────────────────────────────────
 st.header("3. Configure")
 programme_name = st.text_input("Programme Name", placeholder="e.g., AI Powered Business Analytics")
-end_date = st.text_input("End Date", placeholder="e.g., 15 May 2025")
+start_date = st.text_input("Programme Start Date", placeholder="e.g., 1 January 2025")
+end_date = st.text_input("Programme End Date", placeholder="e.g., 15 May 2025")
 owner_password = st.text_input("Owner Password", type="password", help="Set a password to lock PDF editing. Recipients can view and print but cannot edit. Use this password in Adobe Acrobat if you need to unlock editing later.")
 st.caption("Keep this password safe — you'll need it to edit the PDFs later. Minimum 4 characters.")
 
@@ -127,6 +128,7 @@ ready = (
     template_valid
     and data_valid
     and programme_name
+    and start_date
     and end_date
     and owner_password
     and len(owner_password) >= 4
@@ -141,6 +143,7 @@ if st.button("Generate Reports", disabled=not ready, type="primary"):
 
     config = {
         "programme_name": programme_name,
+        "start_date": start_date,
         "end_date": end_date,
         "owner_password": owner_password,
         "pattern": DEFAULT_PATTERN,

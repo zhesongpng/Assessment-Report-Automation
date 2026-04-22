@@ -30,7 +30,17 @@ def build_replacements(row, config):
             replacements[placeholder_name] = str(val)
 
     replacements["Programme Name"] = config.get("programme_name", "")
+    replacements["Start Date"] = config.get("start_date", "")
     replacements["End Date"] = config.get("end_date", "")
+
+    start = config.get("start_date", "")
+    end = config.get("end_date", "")
+    if start and end:
+        replacements["Programme date"] = f"{start} to {end}"
+    elif end:
+        replacements["Programme date"] = end
+    else:
+        replacements["Programme date"] = start
 
     return replacements
 

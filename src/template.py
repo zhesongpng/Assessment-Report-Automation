@@ -68,7 +68,7 @@ def validate_template(uploaded_file):
             return {
                 "valid": False,
                 "fields": [],
-                "error": "No placeholders found. Add <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<End Date>> in your template."
+                "error": "No placeholders found. Add <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<Programme date>>, <<Start Date>>, <<End Date>> in your template."
             }
 
         return {"valid": True, "fields": sorted(fields), "error": None}
