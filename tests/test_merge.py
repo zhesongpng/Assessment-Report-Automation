@@ -3,8 +3,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from docx import Document
+from docx.oxml.ns import qn
 
-from src.merge import build_replacements, merge_template, get_template_fields
+from src.merge import build_replacements, merge_template, get_template_fields, _replace_in_paragraph
 
 
 class TestBuildReplacements:
@@ -95,3 +97,86 @@ class TestGetTemplateFields:
     def test_file_not_found(self):
         with pytest.raises(FileNotFoundError):
             get_template_fields("/nonexistent.docx")
+
+
+class TestCrossRunFormattingPreservation:
+    """Regression: placeholders split across runs must not corrupt formatting.
+
+    Microsoft Word frequently splits text across multiple runs with different
+    formatting. The old code merged all runs into the first run, causing the
+    entire paragraph to inherit the first run's formatting (e.g. bold).
+    """
+
+    def test_cross_run_replacement_preserves_non_bold_formatting(self):
+        """A placeholder split across a bold run and a normal run must not
+        make the surrounding normal text become bold."""
+        doc = Document()
+        paragraph = doc.add_paragraph()
+
+        # Simulate Word splitting "<<Learner Name>>" across two runs:
+        # Run 1: "<<Learner" (bold=True)   Run 2: " Name>>" (bold=False)
+        run1 = paragraph.add_run("<<Learner")
+        run1.bold = True
+        run2 = paragraph.add_run(" Name>>")
+        run2.bold = False
+
+        _replace_in_paragraph(paragraph, {"<<Learner Name>>": "Alice Tan"})
+
+        # The replacement should have happened
+        assert "Alice Tan" in paragraph.text
+        assert "<<Learner Name>>" not in paragraph.text
+
+        # Run 1 (originally bold) should stay bold
+        assert run1.bold is True
+
+        # Run 2 (originally not bold) should still not be bold
+        assert run2.bold is False
+
+    def test_cross_run_replacement_preserves_each_run_formatting(self):
+        """Text after the placeholder in the last run keeps its formatting."""
+        doc = Document()
+        paragraph = doc.add_paragraph()
+
+        # Simulate: "Dear <<Learner" (run1, italic) + " Name>>, welcome!" (run2, not italic)
+        run1 = paragraph.add_run("Dear <<Learner")
+        run1.italic = True
+        run2 = paragraph.add_run(" Name>>, welcome!")
+        run2.italic = False
+
+        _replace_in_paragraph(paragraph, {"<<Learner Name>>": "Bob"})
+
+        assert "Dear Bob, welcome!" in paragraph.text
+        assert run1.italic is True
+        assert run2.italic is False
+
+    def test_cross_run_replacement_via_merge_template(self, tmp_path):
+        """End-to-end: a DOCX with split-run placeholders merges correctly
+        and preserves each run's formatting in the output file."""
+        # Create a template where the placeholder is split across runs
+        doc = Document()
+        paragraph = doc.add_paragraph()
+        run1 = paragraph.add_run("Result: <<Grades")
+        run1.bold = True
+        run2 = paragraph.add_run(">> for <<Learner Name>>")
+        run2.bold = False
+
+        template_path = str(tmp_path / "split_template.docx")
+        output_path = str(tmp_path / "output.docx")
+        doc.save(template_path)
+
+        replacements = {"Grades": "Distinction", "Learner Name": "Carol"}
+        merge_template(template_path, replacements, output_path)
+
+        # Read back the output and verify
+        result_doc = Document(output_path)
+        result_para = result_doc.paragraphs[0]
+
+        assert "Distinction" in result_para.text
+        assert "Carol" in result_para.text
+        assert "<<" not in result_para.text
+
+        # Verify bold/non-bold runs are preserved
+        bold_runs = [r for r in result_para.runs if r.bold is True]
+        non_bold_runs = [r for r in result_para.runs if r.bold is False]
+        assert len(bold_runs) >= 1, "At least one run should remain bold"
+        assert len(non_bold_runs) >= 1, "At least one run should remain non-bold"

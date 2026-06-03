@@ -122,6 +122,66 @@ def _replace_placeholders(doc, replacements):
                     _replace_in_paragraph(paragraph, replace_map)
 
 
+def _replace_cross_run(runs, pattern, value):
+    """Replace a placeholder that spans multiple runs, preserving formatting.
+
+    Strategy: concatenate all run texts, find the pattern, then distribute
+    the replacement back across the original runs — keeping each run's
+    formatting (bold, italic, font, size, etc.) intact.
+    """
+    texts = [r.text for r in runs]
+    combined = ''.join(texts)
+
+    if pattern not in combined:
+        return
+
+    # Build a character-offset map: char index -> (run index, offset within run)
+    run_boundaries = []
+    for i, t in enumerate(texts):
+        run_boundaries.append((i, len(t)))
+
+    # Find pattern position in combined text
+    start = combined.index(pattern)
+    end = start + len(pattern)
+
+    # Map combined-text offsets to run indices and positions within those runs
+    char_count = 0
+    start_run = start_pos = end_run = end_pos = None
+    for run_idx, run_len in run_boundaries:
+        run_start = char_count
+        run_end = char_count + run_len
+
+        if start_run is None and start < run_end:
+            start_run = run_idx
+            start_pos = start - run_start
+
+        if end_run is None and end <= run_end:
+            end_run = run_idx
+            end_pos = end - run_start
+
+        char_count = run_end
+
+    if start_run is None or end_run is None:
+        return
+
+    if start_run == end_run:
+        # Pattern is within a single run (shouldn't reach here, but safe fallback)
+        runs[start_run].text = (
+            runs[start_run].text[:start_pos] + value + runs[start_run].text[end_pos:]
+        )
+    else:
+        # Pattern spans multiple runs
+        # First run: keep text before the pattern start, prepend the value
+        runs[start_run].text = runs[start_run].text[:start_pos] + value
+
+        # Intermediate runs (between first and last): clear entirely
+        for i in range(start_run + 1, end_run):
+            runs[i].text = ''
+
+        # Last run: keep text after the pattern end
+        runs[end_run].text = runs[end_run].text[end_pos:]
+
+
 def _replace_in_paragraph(paragraph, replace_map):
     """Replace placeholders in a paragraph, handling cross-run cases."""
     full_text = paragraph.text
@@ -138,18 +198,13 @@ def _replace_in_paragraph(paragraph, replace_map):
     if '<<' not in paragraph.text:
         return
 
-    # Cross-run case: merge text into first run
+    # Cross-run case: reconstruct runs preserving each run's formatting
     runs = paragraph.runs
     if not runs:
         return
 
-    merged = paragraph.text
     for pattern, value in replace_map.items():
-        merged = merged.replace(pattern, value)
-
-    runs[0].text = merged
-    for run in runs[1:]:
-        run.text = ''
+        _replace_cross_run(runs, pattern, value)
 
 
 def get_template_fields(template_path):
