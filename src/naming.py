@@ -2,7 +2,7 @@
 import re
 
 
-DEFAULT_PATTERN = "{LearnerName}_{ProgrammeName}_AssessmentReport.pdf"
+DEFAULT_PATTERN = "{LearnerName}_{ProgrammeName}_Document.pdf"
 
 _INVALID_CHARS = re.compile(r'[\\/:*?"<>|]')
 _MULTI_SPACE = re.compile(r'\s+')
@@ -50,6 +50,7 @@ def generate_filename(pattern: str, data_row: dict, programme_name: str) -> str:
         ValueError: if the name field is empty
     """
     # Build lookup: "learnername" -> value, "programme" -> value
+    # Plus any config-derived fields passed via data_row
     lookup = {}
     for col, val in data_row.items():
         key = col.lower().replace(" ", "").replace("_", "")
@@ -57,6 +58,17 @@ def generate_filename(pattern: str, data_row: dict, programme_name: str) -> str:
         lookup[key] = val_str
     lookup["programme"] = programme_name
     lookup["programmename"] = programme_name
+
+    # Config-derived fields (available even if not in data columns)
+    start_date = data_row.get("_start_date", "")
+    end_date = data_row.get("_end_date", "")
+    programme_date = data_row.get("_programme_date", "")
+    if start_date:
+        lookup["startdate"] = start_date
+    if end_date:
+        lookup["enddate"] = end_date
+    if programme_date:
+        lookup["programmedate"] = programme_date
 
     # Substitute {placeholders} in pattern
     def replacer(match):

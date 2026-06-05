@@ -5,12 +5,17 @@ from pathlib import Path
 from docx import Document
 
 
-def build_replacements(row, config):
-    """Build the placeholder replacement mapping for one learner row.
+def build_replacements(row, config, template_fields=None):
+    """Build the placeholder replacement mapping for one data row.
+
+    Matches template placeholders against data columns and config fields.
+    Column matching is case-insensitive with spaces/underscores normalized.
 
     Args:
         row: dict from one DataFrame row (e.g. {"Learner Name": "Tan Wei Ming", "Grades": "Distinction"})
-        config: {"programme_name": str, "end_date": str, ...}
+        config: {"programme_name": str, "start_date": str, "end_date": str, ...}
+        template_fields: list of placeholder names from the template (e.g. ["Learner Name", "Grades"]).
+            If None, falls back to matching common fields.
 
     Returns:
         Dict mapping placeholder names to replacement values.
@@ -18,29 +23,58 @@ def build_replacements(row, config):
     """
     replacements = {}
 
-    field_map = {
-        "Learner Name": "Learner Name",
-        "Grades": "Grades",
+    # Config-derived fields (not from spreadsheet)
+    config_fields = {
+        "Programme Name": config.get("programme_name", ""),
+        "Start Date": config.get("start_date", ""),
+        "End Date": config.get("end_date", ""),
     }
-    for col_name, placeholder_name in field_map.items():
-        val = row.get(col_name)
-        if val is None or (isinstance(val, float) and str(val) == "nan"):
-            replacements[placeholder_name] = ""
-        else:
-            replacements[placeholder_name] = str(val)
-
-    replacements["Programme Name"] = config.get("programme_name", "")
-    replacements["Start Date"] = config.get("start_date", "")
-    replacements["End Date"] = config.get("end_date", "")
-
     start = config.get("start_date", "")
     end = config.get("end_date", "")
     if start and end:
-        replacements["Programme date"] = f"{start} to {end}"
+        config_fields["Programme date"] = f"{start} to {end}"
     elif end:
-        replacements["Programme date"] = end
+        config_fields["Programme date"] = end
     else:
-        replacements["Programme date"] = start
+        config_fields["Programme date"] = start
+
+    if template_fields:
+        # Dynamic matching: for each template placeholder, try data columns then config fields
+        for field in template_fields:
+            field_norm = field.lower().replace(" ", "").replace("_", "")
+
+            # Try data columns first (case-insensitive, space-stripped match)
+            matched = False
+            for col, val in row.items():
+                col_norm = col.lower().replace(" ", "").replace("_", "")
+                if col_norm == field_norm:
+                    if val is None or (isinstance(val, float) and str(val) == "nan"):
+                        replacements[field] = ""
+                    else:
+                        replacements[field] = str(val)
+                    matched = True
+                    break
+
+            # If not found in data, try config fields
+            if not matched:
+                for cf_name, cf_val in config_fields.items():
+                    cf_norm = cf_name.lower().replace(" ", "").replace("_", "")
+                    if cf_norm == field_norm:
+                        replacements[field] = cf_val
+                        matched = True
+                        break
+
+            # If still not matched, use empty string
+            if not matched:
+                replacements[field] = ""
+    else:
+        # Fallback: match all data columns + config fields
+        for col, val in row.items():
+            if val is None or (isinstance(val, float) and str(val) == "nan"):
+                replacements[col] = ""
+            else:
+                replacements[col] = str(val)
+        replacements.update(config_fields)
 
     return replacements
 

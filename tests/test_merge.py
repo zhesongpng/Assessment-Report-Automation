@@ -32,6 +32,24 @@ class TestBuildReplacements:
         assert result["Programme Name"] == ""
         assert result["End Date"] == ""
 
+    def test_dynamic_matching_with_template_fields(self):
+        """When template_fields is provided, dynamically match data columns."""
+        row = {"Email": "alice@example.com", "Course Title": "ML Basics", "Grades": "A"}
+        config = {"programme_name": "Data Science", "start_date": "1 Jan 2025", "end_date": "30 Jun 2025"}
+        result = build_replacements(row, config, template_fields=["Email", "Course Title", "Programme Name", "Programme date"])
+        assert result["Email"] == "alice@example.com"
+        assert result["Course Title"] == "ML Basics"
+        assert result["Programme Name"] == "Data Science"
+        assert result["Programme date"] == "1 Jan 2025 to 30 Jun 2025"
+
+    def test_dynamic_matching_unmatched_field_gets_empty(self):
+        """Template fields not found in data or config get empty string."""
+        row = {"Email": "alice@example.com"}
+        config = {}
+        result = build_replacements(row, config, template_fields=["Email", "Nonexistent Field"])
+        assert result["Email"] == "alice@example.com"
+        assert result["Nonexistent Field"] == ""
+
 
 class TestMergeTemplate:
     def test_merge_produces_output(self, sample_template_path):

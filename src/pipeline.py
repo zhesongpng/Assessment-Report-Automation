@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from src.merge import merge_template, build_replacements
+from src.template import detect_merge_fields
 from src.pdf import convert_to_pdf, protect_pdf, check_libreoffice
 from src.naming import generate_filename, DEFAULT_PATTERN
 
@@ -34,7 +35,7 @@ def process_batch(
         }
     """
     session_id = str(uuid.uuid4())[:8]
-    temp_dir = Path(tempfile.mkdtemp(prefix=f"assessment_{session_id}_"))
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"docs_{session_id}_"))
     merge_dir = temp_dir / "merged"
     pdf_dir = temp_dir / "pdfs"
     protected_dir = temp_dir / "protected"
@@ -46,19 +47,36 @@ def process_batch(
     programme_name = config["programme_name"]
     owner_password = config["owner_password"]
 
+    # Detect template fields once for dynamic matching
+    try:
+        template_fields = detect_merge_fields(template_path)
+    except Exception as e:
+        # Template unreadable — all rows will fail, return early
+        total = len(data_df)
+        zip_path = temp_dir / "documents.zip"
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            pass  # empty ZIP
+        return {
+            "zip_path": zip_path,
+            "success_count": 0,
+            "error_count": total,
+            "errors": [f"Template error: {str(e)}"],
+            "filenames": [],
+        }
+
     total = len(data_df)
     successes = []
     errors = []
 
     for idx, (_, row) in enumerate(data_df.iterrows()):
         learner_name = str(row.get("Learner Name", f"Row {idx + 2}"))
-        msg = f"Processing learner {idx + 1} of {total}: {learner_name}"
+        msg = f"Generating document {idx + 1} of {total}: {learner_name}"
         if progress_callback:
             progress_callback(idx, total, msg)
 
         try:
             # Build replacements
-            replacements = build_replacements(row.to_dict(), config)
+            replacements = build_replacements(row.to_dict(), config, template_fields=template_fields)
 
             # Merge template
             merged_docx = merge_dir / f"learner_{idx}.docx"
@@ -84,7 +102,7 @@ def process_batch(
         progress_callback(total, total, "Packaging files...")
 
     # Create ZIP
-    zip_path = temp_dir / "assessment_reports.zip"
+    zip_path = temp_dir / "documents.zip"
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         for filename, file_path in successes:
             zf.write(file_path, filename)

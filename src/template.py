@@ -1,4 +1,4 @@
-"""Template validation and placeholder detection via python-docx."""
+"""Template validation and placeholder detection for Word documents."""
 import re
 import tempfile
 from pathlib import Path
@@ -68,7 +68,7 @@ def validate_template(uploaded_file):
             return {
                 "valid": False,
                 "fields": [],
-                "error": "No placeholders found. Add <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<Programme date>>, <<Start Date>>, <<End Date>> in your template."
+                "error": "No placeholders found. Add placeholders like <<Column Name>> in your template — they will be matched against columns in your data."
             }
 
         return {"valid": True, "fields": sorted(fields), "error": None}

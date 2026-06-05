@@ -1,4 +1,4 @@
-"""Tests for assessment data parsing and validation."""
+"""Tests for data parsing and validation."""
 import io
 
 import pandas as pd
@@ -79,17 +79,21 @@ class TestValidateData:
         assert result["valid"] is True
         assert result["row_count"] == 2
 
-    def test_missing_learner_name_column(self):
+    def test_missing_learner_name_column_with_template(self):
+        """When template requires 'Learner Name' but data doesn't have it, should still be valid
+        (the field just won't be mapped)."""
         df = pd.DataFrame({"Grades": ["A"], "Name": ["Alice"]})
-        result = validate_data(df)
-        assert result["valid"] is False
-        assert any("Learner Name" in e for e in result["errors"])
+        result = validate_data(df, template_fields=["Learner Name", "Grades"])
+        # Data is valid even if not all template fields match columns
+        assert result["valid"] is True
+        # But only "Grades" should be in the mapping
+        assert any("Grades" in col for col, _ in result["field_mapping"])
 
-    def test_missing_grades_column(self):
-        df = pd.DataFrame({"Learner Name": ["Alice"]})
-        result = validate_data(df)
-        assert result["valid"] is False
-        assert any("Grades" in e for e in result["errors"])
+    def test_no_matching_columns_warns(self):
+        """When no data columns match any template placeholder, a warning should appear."""
+        df = pd.DataFrame({"Email": ["alice@test.com"], "Phone": ["123"]})
+        result = validate_data(df, template_fields=["Learner Name", "Grades"])
+        assert any("match" in w.lower() for w in result["warnings"])
 
     def test_empty_dataframe(self):
         df = pd.DataFrame()
@@ -102,7 +106,7 @@ class TestValidateData:
             "Grades": ["A", "B", "C"],
         })
         result = validate_data(df)
-        assert any("no name" in e.lower() for e in result["errors"])
+        assert any("no value" in e.lower() for e in result["errors"])
 
     def test_duplicate_names(self):
         df = pd.DataFrame({

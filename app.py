@@ -1,6 +1,5 @@
-"""Assessment Report Automation — Streamlit web app."""
+"""Document Automation — Streamlit web app."""
 import tempfile
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -12,10 +11,10 @@ from src.naming import generate_all_filenames, sanitize_filename, DEFAULT_PATTER
 from src.pdf import check_libreoffice
 from src.pipeline import process_batch, cleanup_session
 
-st.set_page_config(page_title="Assessment Report Automation", page_icon="📄", layout="centered")
+st.set_page_config(page_title="Document Automation", page_icon="📄", layout="centered")
 
-st.title("Assessment Report Automation")
-st.caption("Upload your Word template and Excel data, then generate PDF reports for each learner. PDFs are restricted from editing.")
+st.title("Document Automation")
+st.caption("Upload your Word template and data, then generate personalized PDFs for each row. PDFs are restricted from editing.")
 
 # Check LibreOffice availability once
 if "libreoffice_ok" not in st.session_state:
@@ -30,7 +29,7 @@ template_file = st.file_uploader(
     "Word template (.docx)",
     type=["docx"],
     key="template_uploader",
-    help="Upload a Word document with placeholders like <<Learner Name>>, <<Grades>>, <<Programme Name>>, <<Programme date>>, <<Start Date>>, <<End Date>>.",
+    help="Upload a Word document with placeholders like <<Column Name>> that match your data columns.",
 )
 
 template_valid = False
@@ -50,21 +49,25 @@ if template_file:
         st.session_state.pop("template_bytes", None)
 
 # ── Section 2: Data Upload ──────────────────────────────────────────────────
-st.header("2. Upload Assessment Data")
+st.header("2. Upload Data")
 data_file = st.file_uploader(
-    "Assessment results (.xlsx or .csv)",
+    "Data file (.xlsx or .csv)",
     type=["xlsx", "csv"],
     key="data_uploader",
-    help="Excel or CSV file with 'Learner Name' and 'Grades' columns.",
+    help="Excel or CSV file with columns matching the <<Placeholder>> names in your template.",
 )
 
 data_valid = False
 if data_file:
     try:
         df = parse_data(data_file)
-        validation = validate_data(df)
+
+        # Pass template fields for dynamic column matching
+        template_fields = st.session_state.get("template_info", {}).get("fields")
+        validation = validate_data(df, template_fields=template_fields)
+
         if validation["valid"]:
-            st.success(f"Data loaded — {validation['row_count']} learner(s) found.")
+            st.success(f"Data loaded — {validation['row_count']} row(s) found.")
             st.session_state.data_df = df
             data_valid = True
 
@@ -72,10 +75,9 @@ if data_file:
                 st.dataframe(df.head(10), use_container_width=True)
 
             # Show field mapping
-            name_col = _find_column(df, "Learner Name")
-            grades_col = _find_column(df, "Grades")
-            if name_col and grades_col:
-                st.info(f"Column mapping: '{name_col}' → <<Learner Name>>, '{grades_col}' → <<Grades>>")
+            if validation.get("field_mapping"):
+                mappings = [f"'{col}' → <<{placeholder}>>" for col, placeholder in validation["field_mapping"]]
+                st.info("Column mapping: " + ", ".join(mappings))
         else:
             for err in validation["errors"]:
                 st.error(err)
@@ -99,20 +101,30 @@ end_date = st.text_input("Programme End Date", placeholder="e.g., 15 May 2025")
 owner_password = st.text_input("Owner Password", type="password", help="Set a password to lock PDF editing. Recipients can view and print but cannot edit. Use this password in Adobe Acrobat if you need to unlock editing later.")
 st.caption("Keep this password safe — you'll need it to edit the PDFs later. Minimum 4 characters.")
 
-# Naming preview
-if template_valid and data_valid and programme_name:
-    st.subheader("File Name Preview")
-    st.caption(f"Pattern: `{DEFAULT_PATTERN}`")
+# File name pattern
+st.subheader("File Name Pattern")
+file_pattern = st.text_input(
+    "Pattern",
+    value=DEFAULT_PATTERN,
+    help="Use {ColumnName} to insert values from your data. "
+         "Spaces in column names are removed (e.g., {LearnerName} matches 'Learner Name'). "
+         "Always include .pdf at the end.",
+)
+st.caption("Available placeholders: any column name from your data, plus {ProgrammeName}, {StartDate}, {EndDate}, {ProgrammeDate}")
 
+# Naming preview
+if template_valid and data_valid and programme_name and file_pattern:
     try:
         filenames, name_errors, name_warnings = generate_all_filenames(
-            DEFAULT_PATTERN, st.session_state.data_df, programme_name
+            file_pattern, st.session_state.data_df, programme_name
         )
         preview_count = min(5, len(filenames))
-        for i in range(preview_count):
-            st.text(f"  {filenames[i]}")
-        if len(filenames) > preview_count:
-            st.text(f"  ... and {len(filenames) - preview_count} more")
+        if preview_count > 0:
+            st.markdown("**Preview:**")
+            for i in range(preview_count):
+                st.text(f"  {filenames[i]}")
+            if len(filenames) > preview_count:
+                st.text(f"  ... and {len(filenames) - preview_count} more")
 
         for w in name_warnings:
             st.warning(w)
@@ -122,7 +134,7 @@ if template_valid and data_valid and programme_name:
         st.error(f"Naming error: {e}")
 
 # ── Section 4: Generate ─────────────────────────────────────────────────────
-st.header("4. Generate Reports")
+st.header("4. Generate Documents")
 
 ready = (
     template_valid
@@ -132,10 +144,11 @@ ready = (
     and end_date
     and owner_password
     and len(owner_password) >= 4
+    and file_pattern
     and st.session_state.libreoffice_ok
 )
 
-if st.button("Generate Reports", disabled=not ready, type="primary"):
+if st.button("Generate Documents", disabled=not ready, type="primary"):
     # Save template to temp file for processing
     tmp_template = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
     tmp_template.write(st.session_state.template_bytes)
@@ -146,7 +159,7 @@ if st.button("Generate Reports", disabled=not ready, type="primary"):
         "start_date": start_date,
         "end_date": end_date,
         "owner_password": owner_password,
-        "pattern": DEFAULT_PATTERN,
+        "pattern": file_pattern,
     }
 
     progress_bar = st.progress(0, text="Starting...")
@@ -167,7 +180,7 @@ if st.button("Generate Reports", disabled=not ready, type="primary"):
 
         st.session_state.batch_result = result
         progress_bar.progress(100, text="Done!")
-        status_text.text(f"Completed: {result['success_count']} report(s) generated.")
+        status_text.text(f"Completed: {result['success_count']} document(s) generated.")
         st.rerun()
 
     except Exception as e:
@@ -181,12 +194,12 @@ if st.button("Generate Reports", disabled=not ready, type="primary"):
 if "batch_result" in st.session_state:
     result = st.session_state.batch_result
 
-    st.header("5. Download Reports")
+    st.header("5. Download Documents")
 
-    st.success(f"{result['success_count']} report(s) generated successfully.")
+    st.success(f"{result['success_count']} document(s) generated successfully.")
 
     if result["error_count"] > 0:
-        st.warning(f"{result['error_count']} learner(s) could not be processed:")
+        st.warning(f"{result['error_count']} row(s) could not be processed:")
         for err in result["errors"]:
             st.error(err)
 
@@ -199,7 +212,7 @@ if "batch_result" in st.session_state:
         st.download_button(
             label=f"Download ZIP ({zip_size_mb:.1f} MB)",
             data=zip_bytes,
-            file_name=f"{sanitize_filename(programme_name or 'Assessment')}_Reports.zip",
+            file_name=f"{sanitize_filename(programme_name or 'Documents')}_Documents.zip",
             mime="application/zip",
             type="primary",
         )
