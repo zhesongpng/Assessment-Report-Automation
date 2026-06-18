@@ -23,44 +23,53 @@ def build_replacements(row, config, template_fields=None):
     """
     replacements = {}
 
-    # Config-derived fields (not from spreadsheet)
-    config_fields = {
-        "Programme Name": config.get("programme_name", ""),
-        "Start Date": config.get("start_date", ""),
-        "End Date": config.get("end_date", ""),
-    }
     start = config.get("start_date", "")
     end = config.get("end_date", "")
     if start and end:
-        config_fields["Programme date"] = f"{start} to {end}"
+        programme_date = f"{start} to {end}"
     elif end:
-        config_fields["Programme date"] = end
+        programme_date = end
     else:
-        config_fields["Programme date"] = start
+        programme_date = start
+
+    # Config-derived fields (entered by the user, not from the spreadsheet).
+    # Each value lists every template placeholder spelling that should resolve
+    # to it, so a template can say <<Programme Start Date>> or <<Start Date>>.
+    config_fields = {
+        "Programme Name": config.get("programme_name", ""),
+        "Programme Start Date": start,
+        "Start Date": start,
+        "Programme End Date": end,
+        "End Date": end,
+        "Programme Date": programme_date,
+    }
 
     if template_fields:
-        # Dynamic matching: for each template placeholder, try data columns then config fields
+        # Dynamic matching: for each template placeholder, try the user-entered
+        # config fields FIRST, then fall back to spreadsheet columns. Programme
+        # name/dates are programme-wide constants the user typed in, so they must
+        # take precedence over any same-named column in the spreadsheet.
         for field in template_fields:
             field_norm = field.lower().replace(" ", "").replace("_", "")
 
-            # Try data columns first (case-insensitive, space-stripped match)
+            # Try config fields first (user input is authoritative)
             matched = False
-            for col, val in row.items():
-                col_norm = col.lower().replace(" ", "").replace("_", "")
-                if col_norm == field_norm:
-                    if val is None or (isinstance(val, float) and str(val) == "nan"):
-                        replacements[field] = ""
-                    else:
-                        replacements[field] = str(val)
+            for cf_name, cf_val in config_fields.items():
+                cf_norm = cf_name.lower().replace(" ", "").replace("_", "")
+                if cf_norm == field_norm:
+                    replacements[field] = cf_val
                     matched = True
                     break
 
-            # If not found in data, try config fields
+            # If not a config field, try spreadsheet columns
             if not matched:
-                for cf_name, cf_val in config_fields.items():
-                    cf_norm = cf_name.lower().replace(" ", "").replace("_", "")
-                    if cf_norm == field_norm:
-                        replacements[field] = cf_val
+                for col, val in row.items():
+                    col_norm = col.lower().replace(" ", "").replace("_", "")
+                    if col_norm == field_norm:
+                        if val is None or (isinstance(val, float) and str(val) == "nan"):
+                            replacements[field] = ""
+                        else:
+                            replacements[field] = str(val)
                         matched = True
                         break
 

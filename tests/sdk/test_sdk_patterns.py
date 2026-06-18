@@ -57,6 +57,10 @@ def test(name):
     return decorator
 
 
+# `test` is a decorator helper, not a pytest test — stop pytest from collecting it.
+test.__test__ = False
+
+
 # ==============================================================================
 # CORE SDK PATTERN TESTS
 # ==============================================================================

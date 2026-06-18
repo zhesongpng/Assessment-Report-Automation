@@ -76,6 +76,9 @@ exclude = ["tests*", ".*", "__pycache__*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "regression: regression test reproducing a previously-fixed bug",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
